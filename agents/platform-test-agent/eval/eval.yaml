@@ -1,0 +1,145 @@
+# eval/eval.yaml
+# Agent-side declaration for MAP offline + trajectory evaluation.
+# Agent team owns this file.
+# MAP platform reads this file and runs the eval gate.
+#
+# NOTE: Run with PYTHONPATH set to include agents/platform-test-agent so that
+# the `agent.*` module paths resolve correctly:
+#   PYTHONPATH=agents/platform-test-agent:. python scripts/run_offline_evals.py --config agents/platform-test-agent/eval/eval.yaml
+
+agent:
+  name: platform-test-agent
+  type: tool_calling_agent
+  target: agent.target:ask          # ask(question, **context) wrapper — see target.py
+
+langsmith:
+  dataset: platform-test-agent-evals
+  project: platform-test-agent-online
+
+dataset:
+  golden_file: agents/platform-test-agent/eval/golden.jsonl
+  schema:
+    input_question: question
+    input_context: context
+    output_expected_tools: expected_tools
+    output_answer_contains: expected_answer_contains
+    output_answer_not_contains: expected_answer_not_contains
+  langsmith_dataset: platform-test-agent-evals
+  schema_version: v1
+
+response_contract:
+  answer_field: answer
+  tool_calls_field: tool_calls
+  tool_name_field: tool_name
+
+checks:
+  required:
+    - name: answer_present
+      owner: MAP
+      mode: block  # MAP default — pending RAI approval
+      description: >
+        Agent must return a non-empty response.
+    - name: expected_behavior
+      owner: MAP
+      mode: block  # MAP default — pending RAI approval
+      description: >
+        Agent answer must satisfy expected_answer_contains and
+        expected_answer_not_contains from the golden dataset.
+    - name: expected_tools
+      owner: MAP
+      mode: block  # MAP default — pending RAI approval
+      description: >
+        Agent must call the tools listed in expected_tools.
+        This is enforced only when tool traces are available.
+  optional:
+    - name: reference_context_grounding
+      owner: RAI
+      mode: warn
+      description: >
+        Agent response should be grounded only in trusted reference_context.
+    - name: risk_level_policy
+      owner: RAI
+      mode: warn
+      description: >
+        Medium and high risk cases are flagged for closer human review
+        even when required checks pass.
+
+thresholds:
+  correctness: 0.80
+  required_pass_rate: 1.00
+  optional_pass_rate: 0.80
+
+rai_safety_floor:
+  safety: 1.00                      # MAP default — pending RAI approval
+  policy_compliance: 1.00           # MAP default — pending RAI approval
+
+risk_policy:
+  flag_for_review:
+    - medium
+    - high
+
+# ---------------------------------------------------------------------------
+# Trajectory evaluators (effolang-agent-evals SDK)
+# ---------------------------------------------------------------------------
+trajectory_evaluators:
+  package:
+    name: effolang-agent-evals
+    version: "0.0.4"
+
+  source: child_runs                # LangGraph StateGraph emits real child runs
+
+  reference_driven:                 # per-row; auto-skipped when reference has no tool calls
+    - factory: make_reference_tools_used_evaluator
+      key: tools_used
+    - factory: make_reference_tool_count_evaluator
+      key: tool_count_at_least
+      mode: at_least
+
+  hardcoded_invariants:             # global; applied to every row regardless of reference
+    - factory: make_tool_count_evaluator
+      key: status_calls_not_excessive
+      tool_name: check_platform_status
+      min_count: 0
+      max_count: 1
+      owner: RAI
+
+# ---------------------------------------------------------------------------
+# Online evaluation — real-time native LangSmith rules.
+# ---------------------------------------------------------------------------
+online:
+  project: platform-test-agent-online
+  native_rules:
+    opt_in:
+      - name: length_limit
+        params:
+          max_tokens: 100        # answers relay a short canned status line; catches runaway output
+      - name: latency_threshold
+        params:
+          max_seconds: 30        # generous for an LLM + tool-call round trip; catches genuinely hung runs
+      - name: regex_contains
+        params:
+          pattern: "\\b(I (can't|cannot|am unable to)|I'm unable to) (help|assist)\\b"
+          mode: forbid           # flags refusal/give-up phrasing instead of an actual answer
+          case_insensitive: true
+
+# ---------------------------------------------------------------------------
+# LLM-as-judge evaluators (requires effolang-agent-evals[llm] and OPENAI_API_KEY)
+# ---------------------------------------------------------------------------
+llm_judges:
+  enabled: true                     # MAP default — pending RAI approval; set to false on forks or draft PRs without secrets
+  model: "openai:gpt-5.4"           # internal proxy allowed models: gpt-5.4, claude-4.6-sonnet, claude-4.6-opus
+  source: child_runs
+  aggregation: mean
+
+  tool_descriptions:
+    check_platform_status: >
+      Return the current status of a MAP platform component.
+      Args: component (str) — one of "pipeline", "deployment", "runner", "langsmith".
+
+  judges:
+    - factory: make_trajectory_llm_judge_evaluator
+      key: trajectory_accuracy
+    - factory: make_tool_selection_llm_judge_evaluator
+      key: tool_selection_quality
+    - factory: make_tool_invocation_llm_judge_evaluator
+      key: tool_invocation_quality

@@ -1,0 +1,41 @@
+name: platform-test-agent
+graph_name: platform-test-agent
+graph_path: agents/platform-test-agent/agent/graph.py:GRAPH
+langsmith_project: platform-test-agent-online
+image_name: platform-test-agent
+
+resource_spec:
+  cpu: 0.5
+  memory_mb: 512
+  min_scale: 1
+  max_scale: 1
+
+env:
+  LLM_MODEL: claude-sonnet-4-6
+  LANGSMITH_TRACING: "true"
+
+secrets:
+  - OPENAI_API_KEY
+  - OPENAI_API_BASE
+  - LANGSMITH_API_KEY
+  - LANGSMITH_ENDPOINT
+
+evaluation:
+  dataset: platform-test-agent-evals
+  evaluator_model: claude-sonnet-4-6
+  thresholds:
+    correctness: ">=0.8"
+
+metadata:
+  profit_stream: ai_enablement
+  product: managed_agent_platform
+  capability: langsmith
+  business_domain: agentic_platform
+  team: map_platform_test
+  contacts:
+    team:
+      - srilakshmi.velpuri@8451.com
+    technical:
+      - srilakshmi.velpuri@8451.com
+    product:
+      - srilakshmi.velpuri@8451.com

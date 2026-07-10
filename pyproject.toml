@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "langsmith-platform-test-agent"
+version = "0.0.0"
+dynamic = ["dependencies"]
+
+[tool.setuptools.dynamic]
+# The LangGraph Platform Dockerfile installs this project via
+# `uv pip install -e .`, which reads dependencies from [project] here —
+# NOT from requirements.txt directly.
+dependencies = { file = ["requirements.txt"] }
+
+[tool.setuptools.packages.find]
+include = ["agents*"]

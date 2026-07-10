@@ -1,0 +1,22 @@
+name: Deploy Platform Test Agent
+
+on:
+  workflow_dispatch:
+    inputs:
+      experiment_prefix:
+        required: false
+        default: ""
+        type: string
+
+jobs:
+  deploy:
+    # Pinned to feat/scale-deploy-pipeline because that branch is the
+    # current source of deploy_agent.yml and every _*.yml reusable job this
+    # repo's vendored scripts/ were copied from (main is several months
+    # behind and is missing this pipeline entirely). Re-pin to a real
+    # semantic-version tag or @main once that branch merges.
+    uses: 8451LLC/langsmith-agent-quickstart/.github/workflows/deploy_agent.yml@feat/scale-deploy-pipeline
+    with:
+      agent: platform-test-agent
+      experiment_prefix: ${{ inputs.experiment_prefix }}
+    secrets: inherit

@@ -1,0 +1,16 @@
+fastapi
+httpx
+langchain>=1.2.15
+langchain-mcp-adapters
+langchain-openai
+langgraph
+langgraph-cli
+langsmith
+mcp
+openevals
+python-dotenv
+pyyaml
+requests
+langchain-core
+langchain-anthropic
+uvicorn

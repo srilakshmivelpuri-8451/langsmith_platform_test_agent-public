@@ -1,0 +1,9 @@
+{
+  "dependencies": [
+    "."
+  ],
+  "graphs": {
+    "platform-test-agent": "./agents/platform-test-agent/agent/graph.py:GRAPH"
+  },
+  "env": ".env"
+}
